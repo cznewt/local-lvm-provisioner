@@ -10,7 +10,7 @@ SUFFIX=""
 export VERSION=${VERSION:-$(./scripts/version)}
 
 TAG=${TAG:-${VERSION}${SUFFIX}}
-REPO=${REPO:-jpwi}
+REPO=${REPO:-maxmati}
 IMAGE=${IMAGE:-${REPO}/local-lvm-provisioner:${TAG}}
 
 if [ ! -e ./bin/local-lvm-provisioner ]; then
