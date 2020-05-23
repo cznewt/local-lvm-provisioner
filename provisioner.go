@@ -13,11 +13,11 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
-
-	pvController "github.com/kubernetes-incubator/external-storage/lib/controller"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	pvController "sigs.k8s.io/sig-storage-lib-external-provisioner/controller"
 )
 
 type ActionType string
@@ -36,7 +36,7 @@ const (
 var (
 	CmdTimeoutCounts = 120
 
-	ConfigFileCheckInterval = 5 * time.Second
+	ConfigFileCheckInterval = 30 * time.Second
 )
 
 type LocalLVMProvisioner struct {
@@ -167,7 +167,7 @@ func (p *LocalLVMProvisioner) getPathAndVGOnNode(node string) (string, string, e
 	return npMap.Path, vg, nil
 }
 
-func (p *LocalLVMProvisioner) Provision(opts pvController.VolumeOptions) (*v1.PersistentVolume, error) {
+func (p *LocalLVMProvisioner) Provision(opts pvController.ProvisionOptions) (*v1.PersistentVolume, error) {
 	pvc := opts.PVC
 	if pvc.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported")
@@ -222,7 +222,7 @@ func (p *LocalLVMProvisioner) Provision(opts pvController.VolumeOptions) (*v1.Pe
 			Name: name,
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: opts.PersistentVolumeReclaimPolicy,
+			PersistentVolumeReclaimPolicy: *opts.StorageClass.ReclaimPolicy,
 			AccessModes:                   pvc.Spec.AccessModes,
 			VolumeMode:                    &fs,
 			Capacity: v1.ResourceList{
@@ -369,6 +369,7 @@ func (p *LocalLVMProvisioner) createHelperPod(action ActionType, vgOperationArgs
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &privilegedTrue,
 					},
+					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
 			Volumes: []v1.Volume{
@@ -385,13 +386,15 @@ func (p *LocalLVMProvisioner) createHelperPod(action ActionType, vgOperationArgs
 		},
 	}
 
-	pod, err := p.kubeClient.CoreV1().Pods(p.namespace).Create(helperPod)
-	if err != nil {
+	// If it already exists due to some previous errors, the pod will be cleaned up later automatically
+	// https://github.com/rancher/local-path-provisioner/issues/27
+	_, err = p.kubeClient.CoreV1().Pods(p.namespace).Create(helperPod)
+	if err != nil && !k8serror.IsAlreadyExists(err) {
 		return err
 	}
 
 	defer func() {
-		e := p.kubeClient.CoreV1().Pods(p.namespace).Delete(pod.Name, &metav1.DeleteOptions{})
+		e := p.kubeClient.CoreV1().Pods(p.namespace).Delete(helperPod.Name, &metav1.DeleteOptions{})
 		if e != nil {
 			logrus.Errorf("unable to delete the helper pod: %v", e)
 		}
@@ -399,7 +402,7 @@ func (p *LocalLVMProvisioner) createHelperPod(action ActionType, vgOperationArgs
 
 	completed := false
 	for i := 0; i < CmdTimeoutCounts; i++ {
-		if pod, err := p.kubeClient.CoreV1().Pods(p.namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+		if pod, err := p.kubeClient.CoreV1().Pods(p.namespace).Get(helperPod.Name, metav1.GetOptions{}); err != nil {
 			return err
 		} else if pod.Status.Phase == v1.PodSucceeded {
 			completed = true

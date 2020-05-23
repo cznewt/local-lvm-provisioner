@@ -1,4 +1,5 @@
 # Local LVM Provisioner
+[![Build Status](https://drone-publish.rancher.io/api/badges/rancher/local-path-provisioner/status.svg)](https://drone-publish.rancher.io/rancher/local-path-provisioner)[![Go Report Card](https://goreportcard.com/badge/github.com/rancher/local-path-provisioner)](https://goreportcard.com/report/github.com/rancher/local-path-provisioner)
 
 ## Overview
 
@@ -161,15 +162,15 @@ The configuration must obey following rules:
 
 ### Reloading
 
-The provisioner supports automatic reloading of configuration. Users can change the configuration using `kubectl apply` or `kubectl edit` with config map `local-lvm-config`. It will be a delay between user update the config map and the provisioner pick it up.
+The provisioner supports automatic configuration reloading. Users can change the configuration using `kubectl apply` or `kubectl edit` with config map `local-lvm-config`. There is a delay between when the user updates the config map and the provisioner picking it up.
 
-When the provisioner detected the configuration changes, it will try to load the new configuration. Users can observe it in the log
+When the provisioner detects the configuration changes, it will try to load the new configuration. Users can observe it in the log
 
 ```
 time="2018-10-03T05:56:13Z" level=debug msg="Applied config: {\"nodeVGMap\":[{\"node\":\"DEFAULT_VGS_FOR_NON_LISTED_NODES\",\"path\":\"/data\",\"vgs\":[\"vg1\"]},...]}"
 ```
 
-If the reload failed due to some reason, the provisioner will report error in the log, and **continue using the last valid configuration for provisioning in the meantime**.
+If the reload fails, the provisioner will log the error and **continue using the last valid configuration for provisioning in the meantime**.
 
 ```
 time="2018-10-03T05:19:25Z" level=error msg="failed to load the new config file: fail to load config file /etc/config/config.json: invalid character '#' looking for beginning of object key string"
@@ -201,7 +202,7 @@ systemctl daemon-reload
 ## License
 
 Copyright (c) 2019  [Jo-Philipp Wich](http://mein.io/)<br>
-Copyright (c) 2014-2018  [Rancher Labs, Inc.](http://rancher.com/)
+Copyright (c) 2014-2020  [Rancher Labs, Inc.](http://rancher.com/)
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 

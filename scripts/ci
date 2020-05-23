@@ -4,11 +4,7 @@ set -e
 cd $(dirname $0)
 
 ./build
+./test
 ./validate
-./test -cover
+./validate-ci
 ./package
-
-image=`cat ../bin/latest_image`
-
-echo
-echo Longhorn Manager image: ${image}
